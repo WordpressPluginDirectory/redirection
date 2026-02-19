@@ -54,16 +54,11 @@ class Red_Monitor {
 	}
 
 	/**
-	 * @param WP_Post|null $post
-	 * @param WP_Post|null $post_before
+	 * @param WP_Post $post
+	 * @param WP_Post $post_before
 	 * @return bool
 	 */
-	public function can_monitor_post( ?WP_Post $post, ?WP_Post $post_before ): bool {
-		// Defensive check: ensure we have valid post objects
-		if ( $post === null || $post_before === null ) {
-			return false;
-		}
-
+	public function can_monitor_post( WP_Post $post, WP_Post $post_before ): bool {
 		// Check this is for the expected post
 		// @phpstan-ignore isset.property
 		if ( ! isset( $post->ID ) || ! isset( $this->updated_posts[ $post->ID ] ) ) {
@@ -87,16 +82,11 @@ class Red_Monitor {
 	 * Called when a post has been updated - check if the slug has changed
 	 *
 	 * @param int $post_id
-	 * @param WP_Post|null $post
-	 * @param WP_Post|null $post_before
+	 * @param WP_Post $post
+	 * @param WP_Post $post_before
 	 * @return void
 	 */
-	public function post_updated( int $post_id, ?WP_Post $post, ?WP_Post $post_before ): void {
-		// WordPress may pass null during trash/delete operations - handle gracefully
-		if ( $post === null || $post_before === null ) {
-			return;
-		}
-
+	public function post_updated( int $post_id, WP_Post $post, WP_Post $post_before ): void {
 		if ( isset( $this->updated_posts[ $post_id ] ) && $this->can_monitor_post( $post, $post_before ) ) {
 			$this->check_for_modified_slug( $post_id, $this->updated_posts[ $post_id ] );
 		}
@@ -121,12 +111,6 @@ class Red_Monitor {
 	 * @return void
 	 */
 	public function post_trashed( int $post_id ): void {
-		// Only create redirects for post types that are being monitored
-		$post_type = get_post_type( $post_id );
-		if ( $post_type === false || ! in_array( $post_type, $this->monitor_types, true ) ) {
-			return;
-		}
-
 		$permalink = get_permalink( $post_id );
 		if ( $permalink === false ) {
 			return;
@@ -142,21 +126,9 @@ class Red_Monitor {
 			'status'      => 'disabled',
 		);
 
-		/**
-		 * Filter the redirect data before creating a redirect for a trashed post.
-		 *
-		 * @param array $data    The redirect data to be created.
-		 * @param int   $post_id The ID of the trashed post.
-		 */
-		$data = apply_filters( 'redirection_monitor_trashed_data', $data, $post_id );
-
 		// Create a new redirect for this post, but only if not draft
 		if ( $data['url'] !== null && $data['url'] !== false && $data['url'] !== '/' ) {
-			$new_item = Red_Item::create( $data );
-
-			if ( ! is_wp_error( $new_item ) ) {
-				do_action( 'redirection_monitor_created', $new_item, $data['url'], $post_id );
-			}
+			Red_Item::create( $data );
 		}
 	}
 
